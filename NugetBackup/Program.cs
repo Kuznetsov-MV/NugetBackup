@@ -9,8 +9,8 @@ namespace NugetBackup
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("Nuget packages backup utility");
-            if (args.Length != 2)
-             Console.WriteLine("Params: <Project path> <Target directory>");
+            if (args.Length != 2) 
+                Console.WriteLine("Params: <Project path> <Target directory>");
             else
             {
                 BackupPackages(args[0], args[1]);
@@ -21,6 +21,11 @@ namespace NugetBackup
         {
             Console.WriteLine("Project: " + projectPath);
             Console.WriteLine("Target directory: " + targetDirectory);
+            if (!File.Exists(projectPath))
+            {
+                Console.WriteLine("Project file not found. ");
+                return;
+            }
             
             var outputData = ExecuteProcessReadingOutput("dotnet", 
                 "list \""+projectPath+"\" package --format json --include-transitive");
