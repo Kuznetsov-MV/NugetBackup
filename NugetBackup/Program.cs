@@ -33,16 +33,21 @@ namespace NugetBackup
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("Backup packages:");
             var packages = JsonSerializer.Deserialize<NugetPackagesJson>(outputData);
-            foreach (var package in packages.projects[0].frameworks[0].topLevelPackages)
-            {
-                BackupPackage(package.id, package.resolvedVersion, targetDirectory);
-                Console.WriteLine(package.id + ":" + package.resolvedVersion);
-            }
-            foreach (var package in packages.projects[0].frameworks[0].transitivePackages)
-            {
-                BackupPackage(package.id, package.resolvedVersion, targetDirectory);
-                Console.WriteLine(package.id + ":" + package.resolvedVersion);
-            }
+            List<TopLevelPackage> topLevelPackages = packages.projects[0].frameworks[0].topLevelPackages;
+            if (topLevelPackages != null)
+                foreach (var package in topLevelPackages)
+                {
+                    BackupPackage(package.id, package.resolvedVersion, targetDirectory);
+                    Console.WriteLine(package.id + ":" + package.resolvedVersion);
+                }
+
+            List<TransitivePackage> transitivePackages = packages.projects[0].frameworks[0].transitivePackages;
+            if (transitivePackages != null)
+                foreach (var package in transitivePackages)
+                {
+                    BackupPackage(package.id, package.resolvedVersion, targetDirectory);
+                    Console.WriteLine(package.id + ":" + package.resolvedVersion);
+                }
         }
 
         /// <summary>
@@ -76,7 +81,7 @@ namespace NugetBackup
         private static void BackupPackage(string packageName, string packageVersion, string targetDir)
         {
             ExecuteProcessReadingOutput("nuget.exe", 
-                $"install {packageName} -Version {packageVersion} -o {targetDir}");
+                $"install {packageName} -Version {packageVersion} -o "+"\""+targetDir+"\"");
         }
     }
 }
