@@ -10,7 +10,7 @@ namespace NugetBackup
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("Nuget packages backup utility");
             if (args.Length != 2) 
-                Console.WriteLine("Params: <Project path> <Target directory>");
+                Console.WriteLine("Params: <Project|Solution path> <Target directory>");
             else
             {
                 BackupPackages(args[0], args[1]);
@@ -19,7 +19,7 @@ namespace NugetBackup
         
         static void BackupPackages(string projectPath, string targetDirectory)
         {
-            Console.WriteLine("Project: " + projectPath);
+            Console.WriteLine("Project|Solution: " + projectPath);
             Console.WriteLine("Target directory: " + targetDirectory);
             if (!File.Exists(projectPath))
             {
@@ -31,22 +31,30 @@ namespace NugetBackup
                 "list \""+projectPath+"\" package --format json --include-transitive");
 
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("Backup packages:");
-            var packages = JsonSerializer.Deserialize<NugetPackagesJson>(outputData);
-            List<TopLevelPackage> topLevelPackages = packages.projects[0].frameworks[0].topLevelPackages;
+            NugetPackagesJson? packages = JsonSerializer.Deserialize<NugetPackagesJson>(outputData);
+            if (packages != null)
+                foreach (var project in packages.projects)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Backup project packages: " + Path.GetFileName(project.path));
+                    BackupProjectPackages(project, targetDirectory);
+                }
+        }
+
+        private static void BackupProjectPackages(Project project, string targetDirectory)
+        {
+            List<TopLevelPackage> topLevelPackages = project.frameworks[0].topLevelPackages;
             if (topLevelPackages != null)
                 foreach (var package in topLevelPackages)
                 {
                     BackupPackage(package.id, package.resolvedVersion, targetDirectory);
-                    Console.WriteLine(package.id + ":" + package.resolvedVersion);
                 }
 
-            List<TransitivePackage> transitivePackages = packages.projects[0].frameworks[0].transitivePackages;
+            List<TransitivePackage> transitivePackages = project.frameworks[0].transitivePackages;
             if (transitivePackages != null)
                 foreach (var package in transitivePackages)
                 {
                     BackupPackage(package.id, package.resolvedVersion, targetDirectory);
-                    Console.WriteLine(package.id + ":" + package.resolvedVersion);
                 }
         }
 
@@ -80,8 +88,10 @@ namespace NugetBackup
 
         private static void BackupPackage(string packageName, string packageVersion, string targetDir)
         {
+            Console.Write(packageName + ":" + packageVersion);
             ExecuteProcessReadingOutput("nuget.exe", 
                 $"install {packageName} -Version {packageVersion} -o "+"\""+targetDir+"\"");
+            Console.WriteLine(" - done");
         }
     }
 }
