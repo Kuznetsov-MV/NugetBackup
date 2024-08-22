@@ -9,15 +9,23 @@ namespace NugetBackup
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("Nuget packages backup utility");
-            if (args.Length != 2) 
-                Console.WriteLine("Params: <Project|Solution path> <Target directory>");
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Params: <Project|Solution path> <Target directory> <Options>");
+                Console.WriteLine("Options:");
+                Console.WriteLine("  -k keep .nupkg-files only");
+                Console.WriteLine("  -i include transitive packages");
+            }            
             else
             {
-                BackupPackages(args[0], args[1]);
+                bool keepNupkgFilesOnly = args.Length > 2 && args[2] == "-k";
+                bool includeTransitivePackages = args.Length > 3 && args[3] == "-i";
+                BackupPackages(args[0], args[1], keepNupkgFilesOnly, includeTransitivePackages);
             }        
         }
         
-        static void BackupPackages(string projectPath, string targetDirectory)
+        static void BackupPackages(string projectPath, string targetDirectory, bool keepNupkgFilesOnly,
+            bool includeTransitivePackages)
         {
             Console.WriteLine("Project|Solution: " + projectPath);
             Console.WriteLine("Target directory: " + targetDirectory);
@@ -26,19 +34,25 @@ namespace NugetBackup
                 Console.WriteLine("Project file not found. ");
                 return;
             }
-            
-            var outputData = ExecuteProcessReadingOutput("dotnet", 
-                "list \""+projectPath+"\" package --format json --include-transitive");
+
+            var arguments = "list \""+projectPath+"\" package --format json";
+            if (includeTransitivePackages) arguments += " --include-transitive";
+            var outputData = ExecuteProcessReadingOutput("dotnet", arguments);
 
             Console.ForegroundColor = ConsoleColor.White;
             NugetPackagesJson? packages = JsonSerializer.Deserialize<NugetPackagesJson>(outputData);
             if (packages != null)
+            {
                 foreach (var project in packages.projects)
                 {
                     Console.WriteLine();
                     Console.WriteLine("Backup project packages: " + Path.GetFileName(project.path));
                     BackupProjectPackages(project, targetDirectory);
                 }
+                
+                if (keepNupkgFilesOnly) 
+                    KeepNupkgFileOnly(targetDirectory);
+            }
         }
 
         private static void BackupProjectPackages(Project project, string targetDirectory)
@@ -56,6 +70,35 @@ namespace NugetBackup
                 {
                     BackupPackage(package.id, package.resolvedVersion, targetDirectory);
                 }
+        }
+
+        private static void BackupPackage(string packageName, string packageVersion, string targetDir)
+        {
+            Console.Write(packageName + ":" + packageVersion);
+            ExecuteProcessReadingOutput("nuget.exe", 
+                $"install {packageName} -Version {packageVersion} -o "+"\""+targetDir+"\"");
+            Console.WriteLine(" - done");
+        }
+
+        /// <summary>
+        /// Перемещает все файлы пакетов из подкаталогов непосредственно в targetDir, а затем удаляет сами подкаталоги
+        /// с установленными пакетами.
+        /// из targetDir. 
+        /// </summary>
+        /// <param name="packageName"></param>
+        /// <param name="packageVersion"></param>
+        /// <param name="targetDir"></param>
+        private static void KeepNupkgFileOnly(string targetDir)
+        {
+            DirectoryInfo targetDirInfo = new DirectoryInfo(targetDir);
+            foreach (DirectoryInfo dir in targetDirInfo.EnumerateDirectories())
+            {
+                string oldPath = Path.Combine(targetDir, dir.FullName, Path.Combine(dir.FullName, dir.Name+".nupkg"));
+                string newPath = Path.Combine(targetDir, dir.Name+".nupkg");
+                File.Move(oldPath, newPath);
+                dir.Delete(true); 
+            }
+            
         }
 
         /// <summary>
@@ -84,14 +127,6 @@ namespace NugetBackup
             process.Close();
             
             return outputString;
-        }
-
-        private static void BackupPackage(string packageName, string packageVersion, string targetDir)
-        {
-            Console.Write(packageName + ":" + packageVersion);
-            ExecuteProcessReadingOutput("nuget.exe", 
-                $"install {packageName} -Version {packageVersion} -o "+"\""+targetDir+"\"");
-            Console.WriteLine(" - done");
         }
     }
 }
