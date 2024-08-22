@@ -1,29 +1,49 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
+using CommandLineParser.Arguments;
 
 namespace NugetBackup 
 {
     internal class Program
     {
+        private static SwitchArgument _includeTransitivePackagesArgument;
+        private static SwitchArgument _keepNupkgFilesOnlyArgument;
+        private static string _projectPath;
+        private static string _targetDirectory;
+
         static void Main(string[] args)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("Nuget packages backup utility");
-            if (args.Length < 2)
-            {
-                Console.WriteLine("Params: <Project|Solution path> <Target directory> <Options>");
-                Console.WriteLine("Options:");
-                Console.WriteLine("  -k keep .nupkg-files only");
-                Console.WriteLine("  -i include transitive packages");
-            }            
-            else
-            {
-                bool keepNupkgFilesOnly = args.Length > 2 && args[2] == "-k";
-                bool includeTransitivePackages = args.Length > 3 && args[3] == "-i";
-                BackupPackages(args[0], args[1], keepNupkgFilesOnly, includeTransitivePackages);
-            }        
+            
+            if (ParseArguments(args)) 
+                BackupPackages(_projectPath, _targetDirectory, _keepNupkgFilesOnlyArgument.Value, _includeTransitivePackagesArgument.Value);
         }
         
+
+        private static bool ParseArguments(string[] args)
+        {
+            CommandLineParser.CommandLineParser parser = new CommandLineParser.CommandLineParser();
+            
+            _includeTransitivePackagesArgument = new SwitchArgument('i', "includetp", "Include transitive packages", true);
+            _keepNupkgFilesOnlyArgument = new SwitchArgument('k', "keeppo", "Keep .nupkg-files only", true);
+            parser.Arguments.Add(_includeTransitivePackagesArgument);
+            parser.Arguments.Add(_keepNupkgFilesOnlyArgument);
+            
+            parser.ParseCommandLine(args);
+            if (args.Length < 3 || !parser.ParsingSucceeded)
+            {
+                parser.ShowUsage();
+                Console.WriteLine("nugetbackup.exe  <Project|Solution path> <Target directory> options");
+                Console.ForegroundColor = ConsoleColor.White;
+                return false;
+            }
+
+            _projectPath = parser.AdditionalArgumentsSettings.AdditionalArguments[0];
+            _targetDirectory = parser.AdditionalArgumentsSettings.AdditionalArguments[1];
+            return true;
+        }
+
         static void BackupPackages(string projectPath, string targetDirectory, bool keepNupkgFilesOnly,
             bool includeTransitivePackages)
         {
@@ -95,10 +115,9 @@ namespace NugetBackup
             {
                 string oldPath = Path.Combine(targetDir, dir.FullName, Path.Combine(dir.FullName, dir.Name+".nupkg"));
                 string newPath = Path.Combine(targetDir, dir.Name+".nupkg");
-                File.Move(oldPath, newPath);
+                File.Move(oldPath, newPath, true);
                 dir.Delete(true); 
             }
-            
         }
 
         /// <summary>
