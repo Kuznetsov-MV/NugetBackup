@@ -2,7 +2,7 @@
 
 ### Утилита для сохранения всех nuget-пакетов, используемых проектом.
 
-Параметры вызова: `nugetbackup.exe <Project path> <Target directory> options`
+Параметры вызова: `nugetbackup.exe <Project|solution path> <Target directory> options`
 
 Утилита анализирует все используемые C# проектом пакеты и устанавливает их в указанный каталог.
 
